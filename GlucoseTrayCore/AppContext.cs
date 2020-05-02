@@ -96,8 +96,17 @@ namespace GlucoseTrayCore
             _iconService.CreateTextIcon(FetchResult, IsCriticalLow, trayIcon);
         }
 
-        private void ShowBalloon(object sender, EventArgs e) => trayIcon.ShowBalloonTip(2000, "Glucose", GetGlucoseMessage(), ToolTipIcon.Info);
+        private void ShowBalloon(object sender, EventArgs e)
+        {
+            var tooltipIcon = ToolTipIcon.Info;
+            if (FetchResult.Value >= Constants.DangerHighBg || FetchResult.Value <= Constants.DangerLowBg)
+                tooltipIcon = ToolTipIcon.Error;
+            else if (FetchResult.Value >= Constants.HighBg || FetchResult.Value <= Constants.LowBg)
+                tooltipIcon = ToolTipIcon.Warning;
 
-        private string GetGlucoseMessage() => $"{FetchResult.GetFormattedStringValue()}   {FetchResult.Time.ToLongTimeString()}  {FetchResult.TrendIcon}";
+            trayIcon.ShowBalloonTip(2000, "Glucose", GetGlucoseMessage(), tooltipIcon);
+        }
+
+        private string GetGlucoseMessage() => $"{FetchResult.TrendIcon}{FetchResult.GetFormattedStringValue()}\n{FetchResult.Time.ToLongTimeString()}";
     }
 }

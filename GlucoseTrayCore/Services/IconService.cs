@@ -3,7 +3,9 @@ using Dexcom.Fetch.Extensions;
 using Dexcom.Fetch.Models;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Configuration;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -25,17 +27,6 @@ namespace GlucoseTrayCore.Services
 
         public void DestroyMyIcon(IntPtr handle) => DestroyIcon(handle);
 
-        internal Brush SetColor(double val) => val switch
-        {
-            double n when n < Constants.HighBg && n > Constants.LowBg => new SolidBrush(Color.White),
-            double n when n >= Constants.HighBg && n < Constants.DangerHighBg => new SolidBrush(Color.Yellow),
-            double n when n >= Constants.DangerHighBg => new SolidBrush(Color.Red),
-            double n when n <= Constants.LowBg && n > Constants.DangerLowBg => new SolidBrush(Color.Yellow),
-            double n when n <= Constants.DangerLowBg && n > Constants.CriticalLowBg => new SolidBrush(Color.Red),
-            double n when n <= Constants.CriticalLowBg && n > 0 => new SolidBrush(Color.Red),
-            _ => new SolidBrush(Color.White),
-        };
-
         internal void CreateTextIcon(GlucoseFetchResult fetchResult, bool isCriticalLow, NotifyIcon trayIcon)
         {
             var result = fetchResult.GetFormattedStringValue().Replace('.', '\''); // Use ' instead of . since it is narrower and allows a better display of a two digit number + decimal place.
@@ -43,12 +34,12 @@ namespace GlucoseTrayCore.Services
             if (result == "0")
             {
                 _logger.LogWarning("Empty glucose result received.");
-                result = "NUL";
+                result = "ERR";
             }
             else if (isCriticalLow)
             {
                 _logger.LogInformation("Critical low glucose read.");
-                result = "DAN";
+                result = "LOW";
             }
 
             var xOffset = CalculateXPosition(fetchResult);
@@ -57,8 +48,34 @@ namespace GlucoseTrayCore.Services
 
             var bitmapText = new Bitmap(16, 16);
             var g = Graphics.FromImage(bitmapText);
-            g.Clear(Color.Transparent);
-            g.DrawString(result, _fontToUse, SetColor(fetchResult.Value), xOffset, 0f);
+            
+            
+            if (fetchResult.Value <= Constants.DangerLowBg || fetchResult.Value >= Constants.DangerHighBg)
+            {
+                g.Clear(Color.OrangeRed);
+                var pen = new Pen(new SolidBrush(Color.Black));
+                g.DrawLine(pen, 0, 2, 16, 2);
+                g.DrawLine(pen, 0, 13, 16, 13);
+                g.DrawString(result, _fontToUse, new SolidBrush(Color.White), xOffset, 1f);
+            }
+            else if (fetchResult.Value <= Constants.LowBg || fetchResult.Value >= Constants.HighBg)
+            {
+                // If glucose is outside of target range, then add a top and bottom line on the icon to add emphasis.
+                var pen = new Pen(new SolidBrush(Color.Yellow));
+                g.DrawLine(pen, 0, 0, 16, 0);
+                g.DrawLine(pen, 0, 15, 16, 15);
+                g.DrawString(result, _fontToUse, new SolidBrush(Color.Yellow), xOffset, 1f);
+            }
+            else // in normal range
+            {
+                g.Clear(Color.Transparent);
+                g.DrawString(result, _fontToUse, new SolidBrush(Color.LimeGreen), xOffset, 1f);
+
+
+            }
+            
+
+            
             var hIcon = bitmapText.GetHicon();
             var myIcon = Icon.FromHandle(hIcon);
             trayIcon.Icon = myIcon;
