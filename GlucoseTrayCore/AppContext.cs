@@ -18,6 +18,7 @@ namespace GlucoseTrayCore
         private bool IsCriticalLow;
 
         private GlucoseFetchResult FetchResult;
+        private GlucoseFetchResult PreviousFetchResult;
         private readonly IconService _iconService;
 
         public AppContext(ILogger logger)
@@ -89,11 +90,35 @@ namespace GlucoseTrayCore
                 NightscoutAccessToken = Constants.AccessToken,
                 UnitDisplayType = Constants.GlucoseUnitType
             }, _logger);
+            
+            PreviousFetchResult = FetchResult;
             FetchResult = await service.GetLatestReading().ConfigureAwait(false);
             trayIcon.Text = GetGlucoseMessage();
             if (FetchResult.Value <= Constants.CriticalLowBg)
                 IsCriticalLow = true;
             _iconService.CreateTextIcon(FetchResult, IsCriticalLow, trayIcon);
+            
+            if (PreviousFetchResult != null 
+                && PreviousFetchResult.TrendIcon != "⮅" && PreviousFetchResult.TrendIcon != "⮇"
+                && (FetchResult.TrendIcon == "⮅" || FetchResult.TrendIcon == "⮇"))
+            {
+                // Show balloon when the trend changes to double arrow
+                trayIcon.ShowBalloonTip(3000, "Glucose", $"{FetchResult.TrendIcon} {FetchResult.Value}", ToolTipIcon.Warning);
+            }
+
+            if (PreviousFetchResult != null
+                && PreviousFetchResult.Value < Constants.HighBg && FetchResult.Value >= Constants.HighBg)
+            {
+                // Show balloon when it crosses the HighBG threshold
+                trayIcon.ShowBalloonTip(3000, "Glucose", $"{FetchResult.TrendIcon} {FetchResult.Value}", ToolTipIcon.Warning);
+            }
+            
+            if (PreviousFetchResult != null
+                && PreviousFetchResult.Value > Constants.LowBg && FetchResult.Value <= Constants.LowBg)
+            {
+                // Show balloon when it crosses the LowBG threshold
+                trayIcon.ShowBalloonTip(3000, "Glucose", $"{FetchResult.TrendIcon} {FetchResult.Value}", ToolTipIcon.Warning);
+            }
         }
 
         private void ShowBalloon(object sender, EventArgs e)
